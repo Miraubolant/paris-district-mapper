@@ -4,6 +4,12 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { parisDistrictsData } from '@/data/parisDistricts';
 import { DistrictInfo } from './DistrictInfo';
+import { SavedPoints, SavedPoint } from './SavedPoints';
+import { SavePointForm } from './SavePointForm';
+import { Button } from './ui/button';
+import { MapPin, Navigation } from 'lucide-react';
+import { toast } from './ui/sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MapContainerProps {
   mapboxToken: string;
@@ -14,6 +20,14 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
   const map = useRef<mapboxgl.Map | null>(null);
   const [selectedDistrict, setSelectedDistrict] = useState<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [savedPoints, setSavedPoints] = useState<SavedPoint[]>(() => {
+    const saved = localStorage.getItem('savedMapPoints');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [clickedPoint, setClickedPoint] = useState<[number, number] | null>(null);
+  const [showSaveForm, setShowSaveForm] = useState(false);
+  const isMobile = useIsMobile();
+  const markerRefs = useRef<{[id: string]: mapboxgl.Marker}>({});
   
   // Configure Mapbox
   mapboxgl.accessToken = mapboxToken;
@@ -26,7 +40,7 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [2.3522, 48.8566], // Paris coordinates
-      zoom: 13,
+      zoom: isMobile ? 11 : 13,
       pitch: 45, // Add pitch for 3D effect
       bearing: 0,
       antialias: true
@@ -102,10 +116,8 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
       setMapLoaded(true);
     });
 
-    let hoveredDistrictId: number | null = null;
-
     // Change cursor on hover
-    map.current.on('mousemove', 'district-borders', (e) => {
+    map.current.on('mousemove', 'district-borders', () => {
       if (!map.current) return;
       map.current.getCanvas().style.cursor = 'pointer';
     });
@@ -141,17 +153,118 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
       }
     });
 
+    // Handle click on the map to save location
+    map.current.on('click', (e) => {
+      // Don't trigger if clicking on a district or a marker
+      const features = map.current?.queryRenderedFeatures(e.point, { 
+        layers: ['district-borders'] 
+      });
+      
+      if (features && features.length > 0) return;
+      
+      const coordinates: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+      setClickedPoint(coordinates);
+      setShowSaveForm(true);
+    });
+
     return () => {
       if (map.current) {
         map.current.remove();
         map.current = null;
       }
     };
-  }, []);
+  }, [isMobile]);
+
+  // Load saved points markers
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    
+    // Clear old markers
+    Object.values(markerRefs.current).forEach(marker => marker.remove());
+    markerRefs.current = {};
+    
+    // Add new markers for saved points
+    savedPoints.forEach(point => {
+      const marker = new mapboxgl.Marker({ color: '#7E69AB' })
+        .setLngLat(point.coordinates)
+        .addTo(map.current!);
+      
+      markerRefs.current[point.id] = marker;
+    });
+    
+    // Save to localStorage
+    localStorage.setItem('savedMapPoints', JSON.stringify(savedPoints));
+  }, [savedPoints, mapLoaded]);
+
+  const handleSavePoint = (pointData: Omit<SavedPoint, 'id'>) => {
+    const newPoint: SavedPoint = {
+      ...pointData,
+      id: Date.now().toString()
+    };
+    
+    setSavedPoints(prev => [...prev, newPoint]);
+  };
+
+  const handleDeletePoint = (id: string) => {
+    setSavedPoints(prev => prev.filter(point => point.id !== id));
+    
+    // Remove marker
+    if (markerRefs.current[id]) {
+      markerRefs.current[id].remove();
+      delete markerRefs.current[id];
+    }
+    
+    toast.success('Point supprimé');
+  };
+
+  const handleSelectPoint = (point: SavedPoint) => {
+    if (!map.current) return;
+    
+    map.current.flyTo({
+      center: point.coordinates,
+      zoom: 16,
+      pitch: 60,
+      bearing: 30,
+      duration: 1500
+    });
+    
+    // Highlight marker (bounce effect)
+    if (markerRefs.current[point.id]) {
+      const marker = markerRefs.current[point.id];
+      const el = marker.getElement();
+      el.style.transition = 'transform 0.3s ease-in-out';
+      
+      // Simple bounce animation
+      el.style.transform = 'translateY(-10px)';
+      setTimeout(() => {
+        el.style.transform = 'translateY(0)';
+      }, 300);
+    }
+  };
 
   return (
-    <div className="relative w-full h-[calc(100vh-7rem)]">
+    <div className="relative w-full h-[calc(100vh-20rem)] sm:h-[calc(100vh-16rem)] md:h-[calc(100vh-14rem)] lg:h-[calc(100vh-12rem)]">
+      <div className="absolute z-10 top-4 left-4 right-4 flex flex-col gap-2">
+        <SavedPoints 
+          points={savedPoints} 
+          onDeletePoint={handleDeletePoint}
+          onSelectPoint={handleSelectPoint}
+        />
+      </div>
+      
       <div ref={mapContainer} className="absolute inset-0 rounded-lg shadow-lg" />
+      
+      {showSaveForm && clickedPoint && (
+        <SavePointForm 
+          coordinates={clickedPoint} 
+          onSave={handleSavePoint}
+          onClose={() => {
+            setShowSaveForm(false);
+            setClickedPoint(null);
+          }}
+        />
+      )}
+      
       {selectedDistrict && (
         <DistrictInfo 
           district={selectedDistrict} 
