@@ -9,14 +9,6 @@ interface MapContainerProps {
   mapboxToken: string;
 }
 
-// Couleurs distinctes pour chaque arrondissement
-const districtColors = [
-  '#9b87f5', '#7E69AB', '#D6BCFA', '#6E59A5', '#5a478b',
-  '#41336d', '#C4B5FD', '#FEC6A1', '#FDE1D3', '#FFDEE2',
-  '#E5DEFF', '#D3E4FD', '#FEF7CD', '#F2FCE2', '#F1F0FB',
-  '#8B5CF6', '#D946EF', '#F97316', '#0EA5E9', '#403E43'
-];
-
 export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -29,111 +21,32 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    // Initialize map
+    // Initialize map with colored style
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/light-v11',
+      style: 'mapbox://styles/mapbox/streets-v12', // Changed to colored streets style
       center: [2.3522, 48.8566], // Paris coordinates
       zoom: 11.5,
-      pitch: 45, // Ajouter un angle pour voir les bâtiments en 3D
-      bearing: -10, // Légère rotation pour un meilleur effet 3D
-      antialias: true // Améliorer le rendu
+      pitch: 0, // Removed pitch to eliminate 3D effect
+      bearing: 0, // Reset rotation
+      antialias: true
     });
 
     // Add navigation controls
     map.current.addControl(
-      new mapboxgl.NavigationControl({
-        visualizePitch: true,
-      }),
+      new mapboxgl.NavigationControl(),
       'top-right'
     );
 
     map.current.on('load', () => {
       if (!map.current) return;
       
-      // Activer les bâtiments 3D
-      map.current.addLayer({
-        'id': '3d-buildings',
-        'source': 'composite',
-        'source-layer': 'building',
-        'filter': ['==', 'extrude', 'true'],
-        'type': 'fill-extrusion',
-        'minzoom': 12,
-        'paint': {
-          'fill-extrusion-color': [
-            'interpolate',
-            ['linear'],
-            ['get', 'height'],
-            0, '#FFFFFF',
-            50, '#E5E5E5',
-            100, '#CCCCCC',
-            200, '#B3B3B3',
-            400, '#999999'
-          ],
-          'fill-extrusion-height': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            12, 0,
-            12.5, ['get', 'height']
-          ],
-          'fill-extrusion-base': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            12, 0,
-            12.5, ['get', 'min_height']
-          ],
-          'fill-extrusion-opacity': 0.7
-        }
-      });
-      
       map.current.addSource('paris-districts', {
         type: 'geojson',
         data: parisDistrictsData,
       });
 
-      // Ajouter une couche pour les arrondissements avec des couleurs distinctes
-      map.current.addLayer({
-        id: 'district-fills',
-        type: 'fill',
-        source: 'paris-districts',
-        layout: {},
-        paint: {
-          'fill-color': [
-            'match',
-            ['get', 'id'],
-            1, districtColors[0],
-            2, districtColors[1],
-            3, districtColors[2],
-            4, districtColors[3],
-            5, districtColors[4],
-            6, districtColors[5],
-            7, districtColors[6],
-            8, districtColors[7],
-            9, districtColors[8],
-            10, districtColors[9],
-            11, districtColors[10],
-            12, districtColors[11],
-            13, districtColors[12],
-            14, districtColors[13],
-            15, districtColors[14],
-            16, districtColors[15],
-            17, districtColors[16],
-            18, districtColors[17],
-            19, districtColors[18],
-            20, districtColors[19],
-            '#D6BCFA' // Couleur par défaut
-          ],
-          'fill-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            0.9,
-            0.7
-          ]
-        }
-      });
-
+      // Add district outlines without fill colors
       map.current.addLayer({
         id: 'district-borders',
         type: 'line',
@@ -162,59 +75,25 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
         }
       });
 
-      // Ajouter un effet d'ombre pour améliorer la perception des profondeurs
-      map.current.setLight({
-        anchor: 'viewport',
-        color: '#ffffff',
-        intensity: 0.4,
-        position: [1.5, 210, 30]
-      });
-
       setMapLoaded(true);
     });
 
     let hoveredDistrictId: number | null = null;
 
-    // Change cursor and highlight district on hover
-    map.current.on('mousemove', 'district-fills', (e) => {
-      if (!map.current || !e.features || e.features.length === 0) return;
-      
-      if (hoveredDistrictId !== null) {
-        map.current.setFeatureState(
-          { source: 'paris-districts', id: hoveredDistrictId },
-          { hover: false }
-        );
-      }
-      
-      hoveredDistrictId = e.features[0].properties?.id;
-      
-      if (hoveredDistrictId !== null) {
-        map.current.setFeatureState(
-          { source: 'paris-districts', id: hoveredDistrictId },
-          { hover: true }
-        );
-      }
-      
+    // Change cursor on hover
+    map.current.on('mousemove', 'district-borders', (e) => {
+      if (!map.current) return;
       map.current.getCanvas().style.cursor = 'pointer';
     });
 
-    // Reset cursor and highlight when mouse leaves the districts
-    map.current.on('mouseleave', 'district-fills', () => {
+    // Reset cursor when mouse leaves the districts
+    map.current.on('mouseleave', 'district-borders', () => {
       if (!map.current) return;
-      
-      if (hoveredDistrictId !== null) {
-        map.current.setFeatureState(
-          { source: 'paris-districts', id: hoveredDistrictId },
-          { hover: false }
-        );
-      }
-      
-      hoveredDistrictId = null;
       map.current.getCanvas().style.cursor = '';
     });
 
     // Handle click to select district
-    map.current.on('click', 'district-fills', (e) => {
+    map.current.on('click', 'district-borders', (e) => {
       if (!e.features || e.features.length === 0) return;
       
       const feature = e.features[0];
@@ -230,8 +109,6 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
         map.current.flyTo({
           center: [lng, lat],
           zoom: 13.5,
-          pitch: 60, // Augmenter l'angle pour mieux voir les bâtiments
-          bearing: -20,
           duration: 1500,
           essential: true
         });
