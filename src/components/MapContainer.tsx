@@ -9,6 +9,14 @@ interface MapContainerProps {
   mapboxToken: string;
 }
 
+// Couleurs distinctes pour chaque arrondissement
+const districtColors = [
+  '#9b87f5', '#7E69AB', '#D6BCFA', '#6E59A5', '#5a478b',
+  '#41336d', '#C4B5FD', '#FEC6A1', '#FDE1D3', '#FFDEE2',
+  '#E5DEFF', '#D3E4FD', '#FEF7CD', '#F2FCE2', '#F1F0FB',
+  '#8B5CF6', '#D946EF', '#F97316', '#0EA5E9', '#403E43'
+];
+
 export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -27,6 +35,9 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
       style: 'mapbox://styles/mapbox/light-v11',
       center: [2.3522, 48.8566], // Paris coordinates
       zoom: 11.5,
+      pitch: 45, // Ajouter un angle pour voir les bâtiments en 3D
+      bearing: -10, // Légère rotation pour un meilleur effet 3D
+      antialias: true // Améliorer le rendu
     });
 
     // Add navigation controls
@@ -40,11 +51,49 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
     map.current.on('load', () => {
       if (!map.current) return;
       
+      // Activer les bâtiments 3D
+      map.current.addLayer({
+        'id': '3d-buildings',
+        'source': 'composite',
+        'source-layer': 'building',
+        'filter': ['==', 'extrude', 'true'],
+        'type': 'fill-extrusion',
+        'minzoom': 12,
+        'paint': {
+          'fill-extrusion-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'height'],
+            0, '#FFFFFF',
+            50, '#E5E5E5',
+            100, '#CCCCCC',
+            200, '#B3B3B3',
+            400, '#999999'
+          ],
+          'fill-extrusion-height': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            12, 0,
+            12.5, ['get', 'height']
+          ],
+          'fill-extrusion-base': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            12, 0,
+            12.5, ['get', 'min_height']
+          ],
+          'fill-extrusion-opacity': 0.7
+        }
+      });
+      
       map.current.addSource('paris-districts', {
         type: 'geojson',
         data: parisDistrictsData,
       });
 
+      // Ajouter une couche pour les arrondissements avec des couleurs distinctes
       map.current.addLayer({
         id: 'district-fills',
         type: 'fill',
@@ -52,12 +101,36 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
         layout: {},
         paint: {
           'fill-color': [
+            'match',
+            ['get', 'id'],
+            1, districtColors[0],
+            2, districtColors[1],
+            3, districtColors[2],
+            4, districtColors[3],
+            5, districtColors[4],
+            6, districtColors[5],
+            7, districtColors[6],
+            8, districtColors[7],
+            9, districtColors[8],
+            10, districtColors[9],
+            11, districtColors[10],
+            12, districtColors[11],
+            13, districtColors[12],
+            14, districtColors[13],
+            15, districtColors[14],
+            16, districtColors[15],
+            17, districtColors[16],
+            18, districtColors[17],
+            19, districtColors[18],
+            20, districtColors[19],
+            '#D6BCFA' // Couleur par défaut
+          ],
+          'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
-            '#9b87f5',
-            '#D6BCFA'
-          ],
-          'fill-opacity': 0.7
+            0.9,
+            0.7
+          ]
         }
       });
 
@@ -68,7 +141,7 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
         layout: {},
         paint: {
           'line-color': '#7E69AB',
-          'line-width': 1.5
+          'line-width': 2
         }
       });
 
@@ -78,13 +151,23 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
         source: 'paris-districts',
         layout: {
           'text-field': ['get', 'id'],
-          'text-size': 14,
+          'text-size': 16,
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-anchor': 'center'
         },
         paint: {
-          'text-color': '#1A1F2C'
+          'text-color': '#1A1F2C',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 1
         }
+      });
+
+      // Ajouter un effet d'ombre pour améliorer la perception des profondeurs
+      map.current.setLight({
+        anchor: 'viewport',
+        color: '#ffffff',
+        intensity: 0.4,
+        position: [1.5, 210, 30]
       });
 
       setMapLoaded(true);
@@ -146,8 +229,11 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
         
         map.current.flyTo({
           center: [lng, lat],
-          zoom: 13,
-          duration: 1000
+          zoom: 13.5,
+          pitch: 60, // Augmenter l'angle pour mieux voir les bâtiments
+          bearing: -20,
+          duration: 1500,
+          essential: true
         });
       }
     });

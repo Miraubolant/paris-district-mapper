@@ -20,8 +20,12 @@ const Index = () => {
               Carte des arrondissements de Paris
             </h2>
             <p className="text-gray-600">
-              Explorez les 20 arrondissements de Paris. Cliquez sur un arrondissement pour afficher plus d'informations.
+              Explorez les 20 arrondissements de Paris en 3D. Chaque arrondissement est représenté par une couleur unique. 
+              Cliquez sur un arrondissement pour voir ses détails et apprécier les bâtiments en trois dimensions.
             </p>
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-700">
+              <p>Astuce : Utilisez la molette de la souris pour zoomer et les contrôles de navigation pour modifier l'angle de vue et admirer les bâtiments en 3D.</p>
+            </div>
             <MapContainer mapboxToken={mapboxToken} />
           </div>
         )}
