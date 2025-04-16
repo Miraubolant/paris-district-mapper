@@ -24,7 +24,7 @@ const Index = () => {
               Cliquez sur un arrondissement pour voir ses détails.
             </p>
             <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-700">
-              <p>Astuce : Utilisez la molette de la souris pour zoomer et les contrôles de navigation pour vous déplacer sur la carte.</p>
+              <p>Astuce : Utilisez la molette de la souris pour zoomer et les contrôles de navigation pour vous déplacer sur la carte. La carte est en 3D, vous pouvez voir les bâtiments lorsque vous zoomez.</p>
             </div>
             <MapContainer mapboxToken={mapboxToken} />
           </div>

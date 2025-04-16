@@ -21,14 +21,14 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    // Initialize map with colored style
+    // Initialize map with colored style and 3D settings
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12', // Changed to colored streets style
+      style: 'mapbox://styles/mapbox/streets-v12',
       center: [2.3522, 48.8566], // Paris coordinates
-      zoom: 11.5,
-      pitch: 0, // Removed pitch to eliminate 3D effect
-      bearing: 0, // Reset rotation
+      zoom: 13,
+      pitch: 45, // Add pitch for 3D effect
+      bearing: 0,
       antialias: true
     });
 
@@ -40,6 +40,30 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
 
     map.current.on('load', () => {
       if (!map.current) return;
+      
+      // Add 3D buildings layer
+      map.current.addLayer({
+        'id': '3d-buildings',
+        'source': 'composite',
+        'source-layer': 'building',
+        'filter': ['==', 'extrude', 'true'],
+        'type': 'fill-extrusion',
+        'minzoom': 12,
+        'paint': {
+          'fill-extrusion-color': '#8E9196',
+          'fill-extrusion-height': [
+            'interpolate', ['linear'], ['zoom'],
+            15, 0,
+            16, ['get', 'height']
+          ],
+          'fill-extrusion-base': [
+            'interpolate', ['linear'], ['zoom'],
+            15, 0,
+            16, ['get', 'min_height']
+          ],
+          'fill-extrusion-opacity': 0.7
+        }
+      });
       
       map.current.addSource('paris-districts', {
         type: 'geojson',
@@ -108,7 +132,9 @@ export const MapContainer = ({ mapboxToken }: MapContainerProps) => {
         
         map.current.flyTo({
           center: [lng, lat],
-          zoom: 13.5,
+          zoom: 14,
+          pitch: 55, // Increase pitch when zooming to district
+          bearing: 20, // Add slight rotation for better 3D view
           duration: 1500,
           essential: true
         });
